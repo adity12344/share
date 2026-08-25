@@ -16,9 +16,9 @@ The core design decision was to treat "exchange" as broader than buying and sell
 
 Five categories (Textbooks, Electronics, Services, Opportunities, Dorm Essentials) map directly to the different types of untapped value described in the challenge context — goods, skills, and opportunities all live in the same feed instead of being forced into a generic marketplace format.
 The Wanted Board exists because supply-only listings miss half the problem — plenty of value goes untapped simply because the person who wants it has no way to broadcast that demand. The board lets a student post a specific need (e.g., "Wanted: Scientific Calculator") with a budget and urgency, inverting the usual listing logic.
-The AI Campus Assistant is grounded in real SRMIST context (Tech Park, UB Building, Central Library) rather than generic chat, so its answers are actually usable by a student navigating campus — this is the "smart, dynamic assistant" and "logical decision-making based on context" the challenge asks for.
-The AI Deal Checker applies category- and condition-aware logic to flag a listing as Great Deal, Fair Price, or Overpriced, giving students a fast, low-effort way to judge whether an exchange is fair before committing — decision support baked into the core flow, not a bolt-on feature.
-Verification scoped to @srmist.edu.in was a deliberate trust decision: real-world usability for a campus exchange depends on knowing you're only ever dealing with fellow students.
+1.The AI Campus Assistant is grounded in real SRMIST context (Tech Park, UB Building, Central Library) rather than generic chat, so its answers are actually usable by a student navigating campus — this is the "smart, dynamic assistant" and "logical decision-making based on context" the challenge asks for.
+2.The AI Deal Checker applies category- and condition-aware logic to flag a listing as Great Deal, Fair Price, or Overpriced, giving students a fast, low-effort way to judge whether an exchange is fair before committing — decision support baked into the core flow, not a bolt-on feature.
+3.Verification scoped to @srmist.edu.in was a deliberate trust decision: real-world usability for a campus exchange depends on knowing you're only ever dealing with fellow students.
 
  How the Solution Works
 A student signs in with their @srmist.edu.in account.
@@ -38,6 +38,6 @@ Every user is a verified, currently-enrolled SRMIST student with an @srmist.edu.
 Listings are for genuine on-campus exchange (buy, sell, request, teach, give away), not general e-commerce or off-campus resale.
 Pricing benchmarks used by the AI Deal Checker are approximate and meant to guide, not guarantee, a fair trade — final agreement is always between the two students.
 The platform assumes reasonable good faith between verified students; it does not currently handle disputes or payments directly.
-🚀 Repository & Workflow
+Repository & Workflow
 Public GitHub repository, single branch, with regular commits tracking progress from initial prototype to current state.
 All project code for SHARE lives in this repository.
