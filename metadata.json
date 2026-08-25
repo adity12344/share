@@ -1,0 +1,7 @@
+{
+  "name": "Share",
+  "description": "A trusted college marketplace for students to buy, sell, and exchange textbooks, electronics, dorm essentials, services, and opportunities.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

@@ -1,0 +1,272 @@
+@import "tailwindcss";
+
+@theme {
+  --font-bebas: 'Bebas Neue', cursive, sans-serif;
+  --font-retro: 'Bebas Neue', cursive, sans-serif;
+  --font-poppins: 'Poppins', sans-serif;
+  --font-sans: 'Poppins', 'Plus Jakarta Sans', sans-serif;
+
+  --color-retro-cream: #faf6ee;
+  --color-retro-paper: #f3ebdd;
+  --color-retro-parchment: #e8dcb8;
+  --color-retro-charcoal: #1e1c1a;
+  --color-retro-ink: #12100e;
+  --color-retro-mustard: #f59e0b;
+  --color-retro-amber: #d97706;
+  --color-retro-terracotta: #d95d39;
+  --color-retro-rust: #c2410c;
+  --color-retro-teal: #0d9488;
+  --color-retro-pine: #15803d;
+  --color-retro-moss: #2d6a4f;
+  --color-retro-denim: #2563eb;
+  --color-retro-navy: #1e3a8a;
+  --color-retro-cassette: #292524;
+  --color-retro-tape: #78716c;
+
+  --shadow-retro-sm: 2px 2px 0px 0px #1e1c1a;
+  --shadow-retro: 3px 3px 0px 0px #1e1c1a;
+  --shadow-retro-lg: 5px 5px 0px 0px #1e1c1a;
+  --shadow-retro-xl: 7px 7px 0px 0px #1e1c1a;
+}
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ==========================================================================
+   Keyframe Animations for Retro Campus Experience
+   ========================================================================== */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(1.5deg);
+  }
+}
+
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-12px) rotate(-2deg);
+  }
+}
+
+@keyframes floatReverse {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(8px) rotate(-1.5deg);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes popIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  65% {
+    transform: scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes wiggle {
+  0%, 100% {
+    transform: rotate(-2deg);
+  }
+  50% {
+    transform: rotate(2deg);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(245, 158, 11, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(245, 158, 11, 0.85);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes blinkCursor {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes backgroundSlide {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 48px 48px;
+  }
+}
+
+/* ==========================================================================
+   Animation Utility Classes
+   ========================================================================== */
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-pop-in {
+  animation: popIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.animate-float {
+  animation: float 4.5s ease-in-out infinite;
+}
+
+.animate-float-slow {
+  animation: floatSlow 6s ease-in-out infinite;
+}
+
+.animate-float-reverse {
+  animation: floatReverse 5s ease-in-out infinite;
+}
+
+.animate-wiggle {
+  animation: wiggle 1.2s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 3s ease-in-out infinite;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-blink-cursor {
+  animation: blinkCursor 1s step-start infinite;
+}
+
+.animate-background-slide {
+  animation: backgroundSlide 25s linear infinite;
+}
+
+@layer base {
+  body {
+    font-family: 'Poppins', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    color: #1e1c1a;
+    background-color: #faf6ee;
+    -webkit-font-smoothing: antialiased;
+    background-image: radial-gradient(#e5dec9 0.75px, transparent 0.75px);
+    background-size: 24px 24px;
+  }
+  
+  html.dark body {
+    color: #f5f5f4;
+    background-color: #141211;
+    background-image: radial-gradient(#262220 0.75px, transparent 0.75px);
+    background-size: 24px 24px;
+  }
+
+  h1, h2, h3, .font-heading {
+    letter-spacing: 0.02em;
+  }
+}
+
+/* Retro Polaroid & Cassette visual accents */
+.polaroid-frame {
+  background: #ffffff;
+  border: 2px solid #1e1c1a;
+  box-shadow: 4px 4px 0px 0px #1e1c1a;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+html.dark .polaroid-frame {
+  background: #1c1917;
+  border: 2px solid #44403c;
+  box-shadow: 4px 4px 0px 0px #000000;
+}
+
+.polaroid-frame:hover {
+  transform: translateY(-2px);
+  box-shadow: 6px 6px 0px 0px #1e1c1a;
+}
+
+html.dark .polaroid-frame:hover {
+  box-shadow: 6px 6px 0px 0px #000000;
+}
+
+.cassette-label {
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 10px,
+    rgba(217, 119, 6, 0.05) 10px,
+    rgba(217, 119, 6, 0.05) 20px
+  );
+}
+
+.retro-tape-badge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.retro-tape-badge::before {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: 10%;
+  right: 10%;
+  height: 4px;
+  background: rgba(245, 158, 11, 0.35);
+  border-radius: 1px;
+}
+
+/* Custom smooth scroll and scrollbar */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ==========================================================================
+   Accessibility: Reduced Motion Preference
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
