@@ -17,13 +17,16 @@ import {
   Minimize2,
   AlertCircle,
   CheckCircle2,
+  Bug,
 } from 'lucide-react';
-import { User } from '../types';
+import { User, Listing, WantedItem } from '../types';
 import { sendCampusAssistantMessage, AssistantChatMessage } from '../lib/gemini';
 
 interface CampusAssistantChatProps {
   currentUser: User | null;
   onOpenAuth: () => void;
+  listings: Listing[];
+  wanted: WantedItem[];
 }
 
 const INITIAL_GREETING =
@@ -38,6 +41,8 @@ const QUICK_PROMPTS = [
 export const CampusAssistantChat: React.FC<CampusAssistantChatProps> = ({
   currentUser,
   onOpenAuth,
+  listings,
+  wanted,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<AssistantChatMessage[]>([
@@ -46,6 +51,7 @@ export const CampusAssistantChat: React.FC<CampusAssistantChatProps> = ({
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [lastFailedUserMessage, setLastFailedUserMessage] = useState<string | null>(null);
+  const [isDebugModeEnabled, setIsDebugModeEnabled] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -101,9 +107,11 @@ export const CampusAssistantChat: React.FC<CampusAssistantChatProps> = ({
     setIsLoading(true);
 
     try {
-      // Call backend API with conversation history and user auth token
-      const responseText = await sendCampusAssistantMessage(
+      // Call backend API with conversation history, listings, and user auth token
+      const resData = await sendCampusAssistantMessage(
         updatedMessages,
+        listings,
+        wanted,
         currentUser.uid
       );
 
@@ -111,7 +119,8 @@ export const CampusAssistantChat: React.FC<CampusAssistantChatProps> = ({
         ...prev,
         {
           role: 'assistant',
-          content: responseText,
+          content: resData.response,
+          debugInfo: resData.debugInfo || null,
         },
       ]);
     } catch (err: any) {
@@ -218,6 +227,19 @@ export const CampusAssistantChat: React.FC<CampusAssistantChatProps> = ({
             <div className="flex items-center gap-1 shrink-0">
               <button
                 type="button"
+                onClick={() => setIsDebugModeEnabled(!isDebugModeEnabled)}
+                className={`p-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center ${
+                  isDebugModeEnabled 
+                    ? 'bg-amber-500/25 text-amber-300 border border-amber-500/30 font-bold' 
+                    : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800'
+                }`}
+                title={isDebugModeEnabled ? "Disable Debug Mode" : "Enable Debug Mode"}
+                aria-label="Toggle Debug Mode"
+              >
+                <Bug className="w-4.5 h-4.5" />
+              </button>
+              <button
+                type="button"
                 onClick={handleResetChat}
                 className="p-1.5 rounded-lg text-stone-400 hover:text-stone-200 hover:bg-stone-800 transition-colors cursor-pointer"
                 title="Reset conversation"
@@ -308,6 +330,41 @@ export const CampusAssistantChat: React.FC<CampusAssistantChatProps> = ({
                         >
                           {msg.content}
                         </ReactMarkdown>
+                      </div>
+                    )}
+
+                    {!isUser && msg.debugInfo && isDebugModeEnabled && (
+                      <div className="mt-3 pt-2.5 border-t border-dashed border-stone-200 dark:border-stone-700 text-[10px] font-mono space-y-1.5 text-stone-600 dark:text-stone-400">
+                        <div className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold">
+                          <Bug className="w-3.5 h-3.5" />
+                          <span>AI MATCH ENGINE DIAGNOSTICS</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-x-2 gap-y-1 bg-stone-50 dark:bg-stone-900/50 p-2 rounded-xl border border-stone-200 dark:border-stone-800">
+                          <div className="text-stone-500 dark:text-stone-500 font-semibold">Parsed Keywords:</div>
+                          <div className="text-stone-900 dark:text-stone-200 font-extrabold truncate">
+                            {msg.debugInfo.extractedKeywords && msg.debugInfo.extractedKeywords.length > 0 
+                              ? msg.debugInfo.extractedKeywords.map(k => `'${k}'`).join(', ') 
+                              : '(none)'}
+                          </div>
+                          
+                          <div className="text-stone-500 dark:text-stone-500 font-semibold">Active Listings:</div>
+                          <div className="text-stone-900 dark:text-stone-200 font-extrabold">
+                            {msg.debugInfo.matchedListingsCount} items matched
+                          </div>
+
+                          <div className="text-stone-500 dark:text-stone-500 font-semibold">Wanted Requests:</div>
+                          <div className="text-stone-900 dark:text-stone-200 font-extrabold">
+                            {msg.debugInfo.matchedWantedRequestsCount} items matched
+                          </div>
+
+                          <div className="text-stone-500 dark:text-stone-500 font-semibold">Strict Filter:</div>
+                          <div className="text-stone-900 dark:text-stone-200 font-extrabold">
+                            {msg.debugInfo.activeFilters && msg.debugInfo.activeFilters.isAskingForItems ? 'ACTIVE (Physical match only)' : 'INACTIVE (General answer)'}
+                          </div>
+                        </div>
+                        <p className="text-[9px] leading-snug text-stone-500 dark:text-stone-500 italic">
+                          Campus Bot uses a strict title keyword pre-filter to prevent general category items from spamming search results.
+                        </p>
                       </div>
                     )}
                   </div>

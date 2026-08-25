@@ -33,6 +33,7 @@ import { WantedView } from './views/WantedView';
 import { ProfileView } from './views/ProfileView';
 import { ReviewsView } from './views/ReviewsView';
 import { PrivacyView } from './views/PrivacyView';
+import { LeaderboardView } from './views/LeaderboardView';
 import { CampusAssistantChat } from './components/CampusAssistantChat';
 import { INITIAL_MOCK_REVIEWS } from './data/mockData';
 import { Toaster, toast } from 'sonner';
@@ -48,6 +49,7 @@ import {
   LogOut,
   ArrowRight,
   ShieldAlert,
+  Trophy,
 } from 'lucide-react';
 
 const REVIEWS_STORAGE_KEY = 'share_srmist_campus_reviews_v1';
@@ -345,6 +347,10 @@ function AppContent() {
 
             {currentView === 'privacy' && <PrivacyView />}
 
+            {currentView === 'leaderboard' && (
+              <LeaderboardView users={users} currentUser={currentUser} />
+            )}
+
             {currentView === 'profile' && (
               <ProfileView
                 currentUser={currentUser}
@@ -409,6 +415,13 @@ function AppContent() {
                 WANTED BOARD
               </button>
               <button
+                onClick={() => setCurrentView('leaderboard')}
+                className="hover:text-amber-600 dark:hover:text-amber-400 cursor-pointer flex items-center gap-1"
+              >
+                <Trophy className="w-3 h-3 text-amber-500" />
+                LEADERBOARD
+              </button>
+              <button
                 onClick={() => setCurrentView('reviews')}
                 className="hover:text-amber-600 dark:hover:text-amber-400 cursor-pointer flex items-center gap-1"
               >
@@ -464,6 +477,8 @@ function AppContent() {
       {/* 24/7 Grounded Campus Assistant Chatbot */}
       <CampusAssistantChat
         currentUser={currentUser}
+        listings={listings}
+        wanted={wanted}
         onOpenAuth={() => {
           setIntendedAction(null);
           setAuthOpen(true);

@@ -5,6 +5,8 @@ import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { CAMPUS_KNOWLEDGE } from "./lib/ai/campusKnowledge";
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getFirestore, collection, getDocs, query, where, orderBy, limit } from "firebase/firestore";
 
 dotenv.config({ path: ".env.local" });
 dotenv.config();
@@ -159,6 +161,166 @@ async function generateWithFallback(
   throw lastError || new Error("All candidate Gemini models failed.");
 }
 
+// Server-side Firestore initialization and snapshot fetching
+let serverFirebaseApp: any = null;
+let serverDb: any = null;
+
+function getServerFirestore() {
+  if (serverDb) return serverDb;
+  const apiKey = process.env.VITE_FIREBASE_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+  const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  
+  if (apiKey && projectId) {
+    try {
+      const firebaseConfig = {
+        apiKey,
+        authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || `${projectId}.firebaseapp.com`,
+        projectId,
+        storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || `${projectId}.appspot.com`,
+        messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+        appId: process.env.VITE_FIREBASE_APP_ID || process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+      };
+      
+      serverFirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+      serverDb = getFirestore(serverFirebaseApp);
+      return serverDb;
+    } catch (e) {
+      console.warn("Server-side Firebase initialization failed: ", e);
+    }
+  }
+  return null;
+}
+
+interface SanitizedProductSnapshot {
+  title: string;
+  category: string;
+  priceOrBudget: number;
+  status: string;
+}
+
+async function fetchLiveProductsSnapshot(clientListings?: any[], clientWanted?: any[]): Promise<{
+  listings: SanitizedProductSnapshot[];
+  wanted: SanitizedProductSnapshot[];
+}> {
+  const listings: SanitizedProductSnapshot[] = [];
+  const wanted: SanitizedProductSnapshot[] = [];
+  
+  const db = getServerFirestore();
+  if (db) {
+    try {
+      // Fetch 20 most recent OPEN listings
+      const listingsRef = collection(db, "listings");
+      const listingsQuery = query(
+        listingsRef,
+        where("status", "==", "OPEN"),
+        orderBy("createdAt", "desc"),
+        limit(20)
+      );
+      const listingsSnap = await getDocs(listingsQuery);
+      listingsSnap.forEach((doc) => {
+        const data = doc.data();
+        listings.push({
+          title: data.title || "",
+          category: data.category || "",
+          priceOrBudget: Number(data.price) || 0,
+          status: "OPEN",
+        });
+      });
+    } catch (e) {
+      console.warn("Failed server-side Firestore listings query: ", e);
+    }
+    
+    try {
+      // Fetch 20 most recent OPEN wanted items
+      const wantedRef = collection(db, "wanted");
+      const wantedQuery = query(
+        wantedRef,
+        where("status", "==", "OPEN"),
+        orderBy("createdAt", "desc"),
+        limit(20)
+      );
+      const wantedSnap = await getDocs(wantedQuery);
+      wantedSnap.forEach((doc) => {
+        const data = doc.data();
+        wanted.push({
+          title: data.title || "",
+          category: data.category || "",
+          priceOrBudget: Number(data.budget) || 0,
+          status: "OPEN",
+        });
+      });
+    } catch (e) {
+      console.warn("Failed server-side Firestore wanted query: ", e);
+    }
+  }
+  
+  // Graceful fallback to client-supplied data if server query yielded nothing
+  if (listings.length === 0 && Array.isArray(clientListings)) {
+    const active = clientListings.filter((l) => l && l.status === "OPEN");
+    const sorted = active
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+      .slice(0, 20);
+    sorted.forEach((l) => {
+      listings.push({
+        title: l.title || "",
+        category: l.category || "",
+        priceOrBudget: Number(l.price) || 0,
+        status: "OPEN",
+      });
+    });
+  }
+  
+  if (wanted.length === 0 && Array.isArray(clientWanted)) {
+    const active = clientWanted.filter((w) => w && w.status === "OPEN");
+    const sorted = active
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+      .slice(0, 20);
+    sorted.forEach((w) => {
+      wanted.push({
+        title: w.title || "",
+        category: w.category || "",
+        priceOrBudget: Number(w.budget) || 0,
+        status: "OPEN",
+      });
+    });
+  }
+  
+  // If still empty (e.g., initial local dev mode with no databases filled yet), fetch from mockData
+  if (listings.length === 0) {
+    try {
+      const { INITIAL_MOCK_LISTINGS } = await import("./src/data/mockData");
+      if (Array.isArray(INITIAL_MOCK_LISTINGS)) {
+        INITIAL_MOCK_LISTINGS.filter(l => l.status === "OPEN").slice(0, 20).forEach(l => {
+          listings.push({
+            title: l.title || "",
+            category: l.category || "",
+            priceOrBudget: Number(l.price) || 0,
+            status: "OPEN",
+          });
+        });
+      }
+    } catch (e) {}
+  }
+
+  if (wanted.length === 0) {
+    try {
+      const { INITIAL_MOCK_WANTED } = await import("./src/data/mockData");
+      if (Array.isArray(INITIAL_MOCK_WANTED)) {
+        INITIAL_MOCK_WANTED.filter(w => w.status === "OPEN").slice(0, 20).forEach(w => {
+          wanted.push({
+            title: w.title || "",
+            category: w.category || "",
+            priceOrBudget: Number(w.budget) || 0,
+            status: "OPEN",
+          });
+        });
+      }
+    } catch (e) {}
+  }
+  
+  return { listings, wanted };
+}
+
 // In-memory rate limiting store for Campus Bot (Map: userId/ip -> { count, resetTime })
 const assistantRateLimitStore = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
@@ -230,6 +392,12 @@ const AssistantRequestSchema = z.object({
     .array(AssistantMessageSchema)
     .min(1, "At least one message is required")
     .max(50, "Total conversation history exceeds maximum allowed limit"),
+  listings: z
+    .array(z.any())
+    .optional(),
+  wanted: z
+    .array(z.any())
+    .optional(),
 });
 
 // Zod schemas for AI Deal Checker
@@ -441,8 +609,40 @@ function fallbackHeuristicDealCheck(item: { title: string; category: string; pri
   };
 }
 
-function fallbackHeuristicCampusBot(messages: Array<{ role: string; content: string }>) {
+function fallbackHeuristicCampusBot(messages: Array<{ role: string; content: string }>, listings?: any[]) {
   const lastUserMsg = messages.slice().reverse().find((m) => m.role === "user")?.content?.toLowerCase() || "";
+
+  if (Array.isArray(listings) && listings.length > 0) {
+    const activeListings = listings.filter((l: any) => l && l.status !== "COMPLETED");
+    const keywords = ["calculator", "textbook", "book", "laptop", "phone", "matress", "kettle", "chair", "lamp", "earbuds", "notes", "tutor", "service", "dorm", "hostel", "cycle", "cycles", "bike", "scooter", "fridge", "cooler", "fan", "pillow", "bed", "table", "monitor", "charger", "mouse", "keyboard", "headphones", "ipad", "tablet", "watch", "camera", "induction", "cooker"];
+    const userMentionedKeywords = keywords.filter(kw => lastUserMsg.includes(kw));
+    const searchTerms = lastUserMsg.split(/\W+/).filter(t => t.length > 2 && !["there", "have", "want", "need", "like", "find", "some", "with", "from", "srmist", "campus", "available"].includes(t));
+
+    const matchedListings = activeListings.filter((l: any) => {
+      const title = String(l.title || "").toLowerCase();
+      const desc = String(l.description || "").toLowerCase();
+      const cat = String(l.category || "").toLowerCase();
+      
+      if (userMentionedKeywords.some(kw => title.includes(kw) || desc.includes(kw) || cat.includes(kw))) {
+        return true;
+      }
+      if (searchTerms.some(term => title.includes(term) || desc.includes(term))) {
+        return true;
+      }
+      return false;
+    });
+
+    if (matchedListings.length > 0) {
+      let response = `Yes! I found the following available campus products/listings that match or are conceptually similar to what you mentioned:\n\n`;
+      matchedListings.forEach((l) => {
+        response += `• **${l.title}**\n  * Price: **₹${l.price}**\n  * Category: *${l.category}*\n  * Owner: ${l.ownerName || "Student"}\n  * Description: ${l.description || 'No description'}\n\n`;
+      });
+      response += `To get in touch, go to the Marketplace, find the listing card, and click **Contact Seller** to email them directly!`;
+      return response;
+    } else if (userMentionedKeywords.length > 0 || lastUserMsg.includes("is there") || lastUserMsg.includes("do you have") || lastUserMsg.includes("any")) {
+      return `I checked the live marketplace for any available items matching your request, but unfortunately, there are no live listings for that at the moment.\n\nI highly recommend posting a request on the **Wanted Board**! This way, other SRMIST students can see exactly what you need and offer it to you directly.`;
+    }
+  }
 
   if (lastUserMsg.includes("safety") || lastUserMsg.includes("meet") || lastUserMsg.includes("where")) {
     return "For safe exchanges at SRMIST, always meet during daylight in public, well-lit campus spots like Tech Park, Central Library entrance, or Java Green cafeteria. Never transfer money in advance before inspecting the item in person.";
@@ -686,10 +886,10 @@ Respond strictly in valid JSON with keys: searchTerms (array of strings), catego
         return res.status(200).json({ matches: [] });
       }
 
-      // Filter to only valid listings and cap to 12 for speed
+      // Filter to only valid listings and cap to 8 for speed
       const candidateListings = availableListings
         .filter((l: any) => l && typeof l.id === "string" && l.status !== "COMPLETED")
-        .slice(0, 12)
+        .slice(0, 8)
         .map((l: any) => ({
           id: l.id,
           title: l.title || "",
@@ -727,7 +927,7 @@ Evaluate conceptual relevance, budget compatibility, and utility.
 For each candidate listing, assign a matchScore (0-100), write a concise 1-sentence explanation of why it fits, and give a recommendation ('connect' | 'maybe' | 'pass').
 Respond strictly in valid JSON with key 'matches', an array of objects: [{ listingId: string, matchScore: number, explanation: string, recommendation: string }].`,
             responseMimeType: "application/json",
-            maxOutputTokens: 350,
+            maxOutputTokens: 1200,
             temperature: 0.1,
           },
           6000
@@ -823,7 +1023,7 @@ Respond strictly in valid JSON with key 'matches', an array of objects: [{ listi
         return res.status(400).json({ error: errorMessage });
       }
 
-      const { messages } = validationResult.data;
+      const { messages, listings, wanted } = validationResult.data;
 
       // Check total character size across all messages
       const totalLength = messages.reduce((sum, m) => sum + m.content.length, 0);
@@ -836,8 +1036,13 @@ Respond strictly in valid JSON with key 'matches', an array of objects: [{ listi
       // 4. Verify API Key & attempt Gemini generation
       const ai = getGenAI();
       if (!ai) {
-        return res.status(200).json({ response: fallbackHeuristicCampusBot(messages) });
+        return res.status(200).json({ response: fallbackHeuristicCampusBot(messages, listings) });
       }
+
+      let queryTerms: string[] = [];
+      let filteredListings: any[] = [];
+      let filteredWanted: any[] = [];
+      let isAskingForItems: RegExpMatchArray | null = null;
 
       try {
         // Multi-turn Conversation Context (Format properly for Gemini: must start with user, alternating turns)
@@ -880,14 +1085,128 @@ Respond strictly in valid JSON with key 'matches', an array of objects: [{ listi
           }
         }
 
-        const systemInstruction = `You are Campus Bot, the official 24/7 AI Assistant for Share.
+        // Fetch live product and request snapshot
+        const snapshot = await fetchLiveProductsSnapshot(listings, wanted);
+        
+        // Get last user query to perform strict programmatic pre-filtering of lists
+        const lastUserMsgText = messages.slice().reverse().find((m) => m.role === "user")?.content || "";
+        
+        // Normalize and extract keywords (length >= 3, excluding common stopwords/filler words)
+        queryTerms = lastUserMsgText.toLowerCase()
+          .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, " ")
+          .split(/\s+/)
+          .filter(term => term.length >= 3 && !["the", "and", "for", "you", "have", "any", "are", "what", "now", "right", "this", "that", "with", "from", "how", "can", "get", "who", "there", "out", "buy", "sell", "looking", "want", "need", "offering", "available", "please", "show", "list", "find", "some", "someone", "anyone", "about", "your", "here", "item", "items", "product", "products", "exchange", "platform", "srmist", "campus"].includes(term));
+
+        filteredListings = snapshot.listings;
+        filteredWanted = snapshot.wanted;
+
+        // Strict trigger to filter items if the user is asking about specific objects or categories
+        isAskingForItems = lastUserMsgText.toLowerCase().match(/(have|any|search|find|buy|sell|look|get|where|is there|textbook|book|cycle|bicycle|bike|fridge|refrigerator|kettle|tutor|lesson|class|study|chair|lamp|soldering|arduino|sensors|opportunities|services|essentials)/i);
+
+        if (isAskingForItems && queryTerms.length > 0) {
+          filteredListings = snapshot.listings.filter(item => {
+            const titleLower = item.title.toLowerCase();
+            const catLower = item.category.toLowerCase();
+            return queryTerms.some(term => {
+              // Exact physical product checks
+              if (term === "cycle" || term === "bicycle" || term === "bike") {
+                return titleLower.includes("cycle") || titleLower.includes("bicycle") || titleLower.includes("bike");
+              }
+              if (term === "book" || term === "textbook" || term === "books" || term === "textbooks") {
+                return catLower.includes("textbook") || titleLower.includes("book") || titleLower.includes("textbook");
+              }
+              if (term === "fridge" || term === "refrigerator" || term === "fridges" || term === "refrigerators") {
+                return titleLower.includes("fridge") || titleLower.includes("refrigerator");
+              }
+              if (term === "chair" || term === "desk") {
+                return titleLower.includes("chair") || titleLower.includes("desk");
+              }
+              if (term === "kettle") {
+                return titleLower.includes("kettle");
+              }
+              // Normal match against actual title
+              return titleLower.includes(term);
+            });
+          });
+
+          filteredWanted = snapshot.wanted.filter(item => {
+            const titleLower = item.title.toLowerCase();
+            const catLower = item.category.toLowerCase();
+            return queryTerms.some(term => {
+              // Exact physical product checks
+              if (term === "cycle" || term === "bicycle" || term === "bike") {
+                return titleLower.includes("cycle") || titleLower.includes("bicycle") || titleLower.includes("bike");
+              }
+              if (term === "book" || term === "textbook" || term === "books" || term === "textbooks") {
+                return catLower.includes("textbook") || titleLower.includes("book") || titleLower.includes("textbook");
+              }
+              if (term === "fridge" || term === "refrigerator" || term === "fridges" || term === "refrigerators") {
+                return titleLower.includes("fridge") || titleLower.includes("refrigerator");
+              }
+              if (term === "chair" || term === "desk") {
+                return titleLower.includes("chair") || titleLower.includes("desk");
+              }
+              if (term === "kettle") {
+                return titleLower.includes("kettle");
+              }
+              // Normal match against actual title
+              return titleLower.includes(term);
+            });
+          });
+        }
+
+        let compactContext = "";
+        
+        compactContext += "\nCURRENT LIVE LISTINGS:\n";
+        if (filteredListings.length > 0) {
+          filteredListings.forEach((item) => {
+            compactContext += `- [Category: ${item.category}] "${item.title}" - Price: ₹${item.priceOrBudget} (Status: ${item.status})\n`;
+          });
+        } else {
+          compactContext += "(No matching live listings currently available)\n";
+        }
+        
+        compactContext += "\nCURRENT LIVE WANTED REQUESTS:\n";
+        if (filteredWanted.length > 0) {
+          filteredWanted.forEach((item) => {
+            compactContext += `- [Category: ${item.category}] "${item.title}" - Budget: ₹${item.priceOrBudget} (Status: ${item.status})\n`;
+          });
+        } else {
+          compactContext += "(No matching live wanted requests currently available)\n";
+        }
+
+        const systemInstruction = `You are Campus Bot, the official 24/7 AI Assistant for the Share campus exchange platform.
 Your purpose is to help students safely and effectively use the Share campus exchange platform.
 Use the supplied Share knowledge context as the authoritative source for Share-specific information.
-Never invent Share-specific policies, features, fees, privacy practices, verification requirements, support procedures, or safety requirements.
+Never invent Share-specific policies, features, fees, privacy practices, verification requirements, or safety requirements.
+
+CRITICAL PRIVACY & GROUNDING RULES:
+1. NEVER share or invent any specific student's contact details, phone numbers, email addresses, hostel room numbers, or real-life coordinates in your responses. All student communications are handled directly by clicking the secure "Contact" or "Offer" buttons on the listings and wanted cards in the UI. Instruct the user to click those UI buttons to contact owners.
+2. NEVER claim that you do not have access to listings or cannot look up active marketplace items. You have full visibility!
+3. STRICT SPECIFICITY IN PRODUCT MATCHING (ANTI-OVERGENERALIZATION - MANDATORY):
+   - You MUST ONLY list items whose actual TITLE or DESCRIPTION directly corresponds to the specific physical product, book, or service the user is asking about (e.g., if searching for "bicycle", ONLY return actual bicycles/cycles).
+   - NEVER list an item simply because it shares the same category name as the matched item (e.g., do NOT list study chairs, kettles, or refrigerators when the user is asking for a bicycle, even if they are both under the "Dorm Essentials" category).
+   - Under no circumstances should you list "similar items in the same category" unless those items are also direct matches for the requested product.
+   - If a user asks for a product, and there are NO specific matches in the provided data list, do NOT return any listings at all. Instead, say: "I don't see any active listings or wanted requests for that specific item right now. You can check back later or post a Wanted request on the Wanted Board."
+   - Follow these rules strictly, with absolutely NO exceptions.
+
+EXAMPLES OF CORRECT SPECIFIC MATCHING:
+- User asks: "What textbooks are available?"
+  * Correct matches to list: CLRS 4th Ed., Signals and Systems, Principles of Marketing, Engineering Mechanics, Core Java.
+  * Incorrect matches to ignore: Arduino Starter Kit (Electronics), Soldering Station (Electronics).
+- User asks: "Is anyone selling a bicycle?" or "Do you have any bikes?"
+  * Correct matches to list: "Looking for Used Geared Bicycle / Hybrid Cycle (Hercules/Btwin)" (wanted request).
+  * Incorrect matches to ignore: "Ergonomic Mesh Study Chair", "Pigeon Electric Kettle", "Haier 50L Energy-Saver Dorm Mini Refrigerator" (these are Dorm Essentials, but they are NOT bicycles! DO NOT list them).
+- User asks: "Do you have any refrigerators?"
+  * Correct matches to list: "Haier 50L Energy-Saver Dorm Mini Refrigerator" (listing).
+  * Incorrect matches to ignore: "USHA Room Cooler", "Prestige Induction Cooktop" (these are Dorm Essentials, but NOT refrigerators! DO NOT list them).
+
 Tone: Friendly, concise, helpful, student-friendly. Keep ordinary answers around 3-4 sentences.
 
 AUTHORITATIVE SHARE KNOWLEDGE BASE:
 ${CAMPUS_KNOWLEDGE}
+
+${compactContext}
 `;
 
         const response = await generateWithFallback(
@@ -903,18 +1222,47 @@ ${CAMPUS_KNOWLEDGE}
 
         const textResponse = response.text?.trim();
         if (textResponse) {
-          return res.status(200).json({ response: textResponse });
+          return res.status(200).json({
+            response: textResponse,
+            debugInfo: {
+              extractedKeywords: queryTerms,
+              matchedListingsCount: filteredListings.length,
+              matchedWantedRequestsCount: filteredWanted.length,
+              activeFilters: {
+                isAskingForItems: !!isAskingForItems,
+              }
+            }
+          });
         }
       } catch (genErr) {
         console.warn("Campus bot Gemini call failed, falling back to grounded knowledge:", genErr);
       }
 
-      return res.status(200).json({ response: fallbackHeuristicCampusBot(messages) });
+      return res.status(200).json({
+        response: fallbackHeuristicCampusBot(messages, listings),
+        debugInfo: {
+          extractedKeywords: queryTerms,
+          matchedListingsCount: filteredListings.length,
+          matchedWantedRequestsCount: filteredWanted.length,
+          activeFilters: {
+            isAskingForItems: !!isAskingForItems,
+          }
+        }
+      });
     } catch (error: any) {
       console.error("Error in Campus Bot assistant endpoint:", error);
       const fallbackMsgs = Array.isArray(req.body?.messages) ? req.body.messages : [];
+      const fallbackListings = Array.isArray(req.body?.listings) ? req.body.listings : [];
       return res.status(200).json({
-        response: fallbackHeuristicCampusBot(fallbackMsgs),
+        response: fallbackHeuristicCampusBot(fallbackMsgs, fallbackListings),
+        debugInfo: {
+          extractedKeywords: [],
+          matchedListingsCount: 0,
+          matchedWantedRequestsCount: 0,
+          activeFilters: {
+            isAskingForItems: false,
+          }
+        }
       });
     }
   });

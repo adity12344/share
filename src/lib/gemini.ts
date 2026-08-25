@@ -96,12 +96,22 @@ export async function findAIMatches(
 export interface AssistantChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  debugInfo?: {
+    extractedKeywords: string[];
+    matchedListingsCount: number;
+    matchedWantedRequestsCount: number;
+    activeFilters: {
+      isAskingForItems: boolean;
+    };
+  } | null;
 }
 
 export async function sendCampusAssistantMessage(
   messages: AssistantChatMessage[],
+  listings: Listing[],
+  wanted: WantedItem[],
   userId?: string | null
-): Promise<string> {
+): Promise<{ response: string; debugInfo?: any }> {
   if (!userId) {
     throw new Error('Unauthorized: You must be signed in with your college account to talk with Campus Bot.');
   }
@@ -113,7 +123,7 @@ export async function sendCampusAssistantMessage(
       Authorization: `Bearer ${userId}`,
       'x-user-id': userId,
     },
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify({ messages, listings, wanted }),
   });
 
   if (!response.ok) {
@@ -126,7 +136,10 @@ export async function sendCampusAssistantMessage(
     throw new Error('Invalid response from Campus Assistant.');
   }
 
-  return data.response;
+  return {
+    response: data.response,
+    debugInfo: data.debugInfo || null,
+  };
 }
 
 export async function checkAIDeal(

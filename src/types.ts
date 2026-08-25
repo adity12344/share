@@ -60,7 +60,7 @@ export interface WantedItem {
   userExchanges?: number;
 }
 
-export type ViewType = 'home' | 'marketplace' | 'wanted' | 'profile' | 'reviews' | 'privacy';
+export type ViewType = 'home' | 'marketplace' | 'wanted' | 'profile' | 'reviews' | 'privacy' | 'leaderboard';
 
 export type ReviewCategory =
   | 'Marketplace'

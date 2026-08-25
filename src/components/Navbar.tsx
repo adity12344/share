@@ -17,6 +17,7 @@ import {
   HeartHandshake,
   Star,
   ShieldCheck,
+  Trophy,
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -58,6 +59,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { view: 'home', label: 'Home', icon: <Sparkles className="w-3.5 h-3.5" /> },
     { view: 'marketplace', label: 'Marketplace', icon: <ShoppingBag className="w-3.5 h-3.5" /> },
     { view: 'wanted', label: 'Wanted Board', icon: <HeartHandshake className="w-3.5 h-3.5" /> },
+    { view: 'leaderboard', label: 'Leaderboard', icon: <Trophy className="w-3.5 h-3.5 text-amber-500" /> },
     { view: 'reviews', label: 'Reviews', icon: <Star className="w-3.5 h-3.5 fill-amber-400" /> },
     { view: 'privacy', label: 'Privacy', icon: <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> },
   ];
